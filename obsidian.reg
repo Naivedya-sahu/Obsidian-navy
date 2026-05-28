@@ -1,0 +1,14 @@
+Windows Registry Editor Version 5.00
+
+; Adds "Obsidian" right-click context menu on folders.
+; Prerequisites:
+;   1. Obsidian installed at: C:\Program Files\Obsidian\Obsidian.exe
+;   2. open-vault.bat placed at: %APPDATA%\obsidian\open-vault.bat
+;   3. Import as Administrator (writes to HKEY_CLASSES_ROOT)
+
+[HKEY_CLASSES_ROOT\Directory\shell\Obsidian]
+@="Obsidian"
+"Icon"="C:\\Program Files\\Obsidian\\Obsidian.exe"
+
+[HKEY_CLASSES_ROOT\Directory\shell\Obsidian\command]
+@="\"C:\\Users\\%USERNAME%\\AppData\\Roaming\\obsidian\\open-vault.bat\" \"%1\""
