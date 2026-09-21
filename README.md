@@ -11,7 +11,7 @@ Right-clicking a folder shows an **Obsidian** submenu with two entries:
 | Entry | Result |
 |-------|--------|
 | **Open as plain vault** | A bare vault — empty `.obsidian`, stock Obsidian, no community plugins |
-| **Open as vault with plugins** | Same, but `.obsidian` is seeded from a bundled template: 15 community plugins, 3 themes, and the appearance settings |
+| **Open as vault with plugins** | Same, but `.obsidian` is seeded from a bundled template: 14 community plugins, 3 themes, and the appearance settings |
 
 Both entries then do the same four things:
 
@@ -32,9 +32,13 @@ The vault entry is **permanent** — it stays in Obsidian's vault list afterward
 
 | | Contents |
 |---|---|
-| Plugins (15) | `calendar`, `cmdr`, `dataview`, `folder-notes`, `homepage`, `obsidian-git`, `obsidian-icon-folder`, `obsidian-kanban`, `obsidian-latex-suite`, `obsidian-tasks-plugin`, `obsidian-tikzjax`, `periodic-notes`, `table-editor-obsidian`, `templater-obsidian`, `voice` |
+| Plugins (14) | `calendar`, `cmdr`, `dataview`, `folder-notes`, `homepage`, `obsidian-icon-folder`, `obsidian-kanban`, `obsidian-latex-suite`, `obsidian-tasks-plugin`, `obsidian-tikzjax`, `table-editor-obsidian`, `templater-obsidian`, `voice` — plus `obsidian-git`, shipped but **not** enabled |
 | Themes (3) | Typewriter (active), Minimal, Obsidian Nord |
-| Config | `appearance.json` (Typewriter + Times New Roman interface font), `core-plugins.json`, `community-plugins.json` — all 15 plugins listed as enabled |
+| Config | `appearance.json` (Typewriter + Times New Roman interface font), `core-plugins.json`, `community-plugins.json` — 13 of the 14 listed as enabled |
+
+`obsidian-git` ships but stays **off**: it errors on every vault that isn't a git repo, which is most of them. Turn it on per-vault in Settings → Community plugins when the folder actually is a repo.
+
+Daily notes come from Obsidian's **core** daily-notes plugin, not `periodic-notes`. One consequence: `calendar`'s weekly-note feature needs `periodic-notes` and is therefore inactive — daily notes work fine.
 
 All plugins ship **without** `data.json`, so each new vault gets them at stock defaults — no personal plugin settings leak into a seeded folder.
 
@@ -128,7 +132,7 @@ Obsidian rewrites `obsidian.json` with its own in-memory state when it exits. Ed
 
 Every genuinely new vault triggers Obsidian's own "Do you trust the author of this vault?" security dialog on first open — that's Obsidian's plugin-safety gate, not something this tool can or should skip. One extra click, once per folder.
 
-This matters more for **Open as vault with plugins**: the seeded plugins stay dormant until you accept that prompt. Decline it and you get a plain vault with 15 plugins sitting on disk, switched off. There's no supported way to pre-trust a vault from outside Obsidian — the prompt exists precisely to stop third-party tools from doing that.
+This matters more for **Open as vault with plugins**: the seeded plugins stay dormant until you accept that prompt. Decline it and you get a plain vault with 14 plugins sitting on disk, switched off. There's no supported way to pre-trust a vault from outside Obsidian — the prompt exists precisely to stop third-party tools from doing that.
 
 ---
 
@@ -257,10 +261,11 @@ The installer is a build artifact — `Output\` is gitignored, so the binary liv
 
 1. **Bump the version.** `MyAppVersion` in `installer.iss` is the single source — it drives Add/Remove Programs, and the git tag should match it.
 
-2. **Rebuild from clean.** If you *removed* anything from the template since the last build, delete `Output\` first; Inno overwrites files but never prunes them.
+2. **Rebuild.** The setup binary is regenerated from the `[Files]` list each compile, so nothing needs clearing here.
    ```
    ISCC.exe installer.iss
    ```
+   Pruning only bites at *install* time: if you removed anything from the template, uninstall the previous version before installing the new one, or the dropped files survive in `{app}\Template`.
 
 3. **Commit and push** the source changes (`installer.iss`, `Default\`, `README.md`).
 
@@ -312,3 +317,58 @@ Releases are **unsigned**. Every download hits SmartScreen's "Windows protected 
 
 **"Obsidian.exe not found" popup when right-clicking**
 - Obsidian was moved or uninstalled after this tool was installed. Reinstall Obsidian Context Menu so it re-detects the current path.
+
+---
+
+## Template Baseline
+
+What the template carries, so future-you can tell how stale it has become. Versions captured **2026-09-21** from Obsidian **1.12.7** on Windows 11.
+
+| Plugin | Version | | Plugin | Version |
+|---|---|---|---|---|
+| `calendar` | 1.5.10 | | `obsidian-kanban` | 2.0.51 |
+| `cmdr` | 0.5.12 | | `obsidian-latex-suite` | 1.13.1 |
+| `dataview` | 0.5.68 | | `obsidian-tasks-plugin` | 8.4.0 |
+| `folder-notes` | 1.8.26 | | `obsidian-tikzjax` | 0.5.2 |
+| `homepage` | 4.5.0 | | `table-editor-obsidian` | 0.23.2 |
+| `obsidian-git` † | 2.40.0 | | `templater-obsidian` | 2.25.1 |
+| `obsidian-icon-folder` | 2.14.7 | | `voice` | 1.19.0 |
+
+† shipped but not enabled.
+
+Themes: Typewriter (active), Minimal, Obsidian Nord. Interface font: Times New Roman.
+
+No plugin ships a `data.json`, so every seeded vault starts at stock defaults.
+
+**Removed in v1.2:** `periodic-notes` (was 0.0.17) — uninstalled outright, not just disabled. Daily notes are handled by Obsidian's core plugin instead.
+
+---
+
+## Known Gaps
+
+Ordered by how much they actually cost.
+
+### Resolved in v1.2
+
+| Was | Now |
+|---|---|
+| `obsidian-git` enabled → error notice on every seeded vault that isn't a git repo | Dropped from `community-plugins.json`. Folder still ships, so it's one toggle away per vault. |
+| Core `daily-notes` **and** `periodic-notes` both claiming the daily-note action, with `periodic-notes` stuck at an unmaintained v0.0.17 | `periodic-notes` removed from the template entirely. Core daily-notes handles it. |
+
+### 1. Minimal theme ships without Style Settings
+
+Minimal is built to be driven by Style Settings; without that plugin you get half a theme for 261 KB. Typewriter is the active theme regardless, so nothing is broken — Minimal is just sitting there under-powered.
+
+**Deliberately left in place** so the alternatives stay available for a future appearance pass. Two ways out when that happens: bundle Style Settings (~50 KB) and keep Minimal usable, or drop Minimal and ship only what's active. Decide it alongside whatever theme change prompts it, not before.
+
+### 2. Plugin updates are permanent repo weight
+
+`obsidian-tikzjax` is 12.6 MB (`main.js` 7.9 MB + `styles.css` 4.8 MB). Every version bump commits another full copy that never leaves history. Three updates ≈ 50 MB. Still far inside GitHub's limits, but refresh bundled plugins deliberately, in batches, not casually.
+
+### 3. Core-plugin IDs are coupled to Obsidian's version
+
+`core-plugins.json` lists `bases`, `webviewer` and `slash-command` — core plugins from Obsidian 1.12.x. If upstream renames or drops one, the template silently carries a dead key. Re-capture `core-plugins.json` from a current vault when you next touch the template.
+
+### Deliberately not doing
+
+Named here so they don't get re-litigated: **code signing** (costs money; SmartScreen warning is documented and acceptable for a personal tool), **CI** (`seed-test.cs` is a manual command and that is proportionate for a dormant tool), **Git LFS** (ceremony at this size), **multiple profiles** (see *Shipping more than one profile* — the only version worth building is shared plugins plus layered config, and nothing yet needs it).

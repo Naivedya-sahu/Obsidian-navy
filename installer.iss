@@ -1,5 +1,5 @@
 #define MyAppName "Obsidian Context Menu"
-#define MyAppVersion "1.1"
+#define MyAppVersion "1.2"
 #define MyAppPublisher "Naivedya Sahu"
 #define MyAppURL "https://github.com/Naivedya-sahu/Obsidian-navy"
 
