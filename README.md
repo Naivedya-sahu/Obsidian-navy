@@ -200,6 +200,94 @@ Everything the installer does is in two source files: `installer.iss` (registry 
 
 An ID listed in `community-plugins.json` with no matching folder shows up in Obsidian as a broken enabled plugin; a folder with no listed ID installs but stays switched off.
 
+#### The edit-and-reship loop
+
+1. Edit `Default\.obsidian\` — `appearance.json`, `core-plugins.json`, `community-plugins.json`, plugin folders, themes.
+2. Bump `MyAppVersion` in `installer.iss`, so Add/Remove Programs tells you which template generation is installed.
+3. Rebuild, then run the installer from `Output\`. Inno Setup's compiler is wherever you installed it — per-user installs land under `%LOCALAPPDATA%\Programs\Inno Setup 6\`, winget installs under `%ProgramFiles(x86)%\Inno Setup 6\`:
+   ```
+   ISCC.exe installer.iss
+   ```
+
+Nothing else needs recompiling — `open-vault.exe` only changes if `open-vault.cs` does. The template is data.
+
+#### What your change actually reaches
+
+| Target | Result |
+|---|---|
+| Vaults you seed **after** reinstalling | Get the new template. This is the normal case and it just works. |
+| Vaults already seeded **before** | Unchanged. The seed never overwrites, so every file it would write is already there. |
+
+To push a change into an already-seeded vault, delete the specific file or plugin folder from that vault's `.obsidian\`, then run **Open as vault with plugins** again — it refills only what's missing. There is deliberately no "reset this vault to template" action; that would mean overwriting config you may have tuned by hand.
+
+**Removals don't propagate on an over-install.** Inno installs the files it's given; it doesn't prune the destination. Drop a plugin from `Default\` and reinstall over the top, and the old folder survives in `{app}\Template\plugins\`. Uninstall first, then install, whenever you remove something.
+
+#### Capturing tweaks from a live vault
+
+Root-level config (`appearance.json`, `app.json`, `core-plugins.json`, `community-plugins.json`) copies across directly. Per-plugin settings live in `.obsidian\plugins\<id>\data.json` — no bundled plugin ships one today, which is why every seeded vault starts at stock defaults.
+
+> **Read any `data.json` before you commit it.** This repo is public. Plugin settings files routinely carry API keys, git remote URLs with tokens, absolute paths from your own machine, and vault-specific folder names. `obsidian-git` and `voice` are the likely offenders. A seed is meant to be generic — if a setting only makes sense on your laptop, it does not belong in the template.
+
+`workspace.json` and `workspaces.json` are excluded from the build, so editing them changes nothing.
+
+#### Shipping more than one profile
+
+There is **one** template today. `Default\.obsidian\` → `{app}\Template` → one `--template` flag → one submenu entry. That is deliberate: two verbs cover both real cases (bare vault, seeded vault), and a profile you don't yet have a use for is a profile you'll maintain for nothing.
+
+If a second genuinely earns its place — say an academic profile and a writing profile — this is what it costs:
+
+| Change | Detail |
+|---|---|
+| Source layout | `profiles\<name>\.obsidian\` instead of the single `Default\` |
+| `installer.iss` `[Files]` | One `Source:` line per profile → `{app}\Template\<name>` |
+| `open-vault.cs` | `--template` takes a value; resolve `Template\<name>` instead of `Template` |
+| `installer.iss` `[Registry]` | One `Obsidian\shell\NN<name>` verb + `\command` per profile |
+
+**The trap is size.** Profiles duplicate plugin binaries — two profiles sharing fourteen plugins still ship both copies, so a second profile costs another ~21 MB of installer, not the few KB of config that actually differs. If profiles ever land, the layout worth building is shared `plugins\` + `themes\` seeded for every profile, with per-profile `*.json` config layered on top. That's a two-source merge in `SeedMissing`, not a second template — and it's the only version of this feature worth the code.
+
+Until then: one template, edited in place.
+
+---
+
+## Releasing
+
+The installer is a build artifact — `Output\` is gitignored, so the binary lives on GitHub Releases, not in the repo. A release is what the Installation section's download link points at.
+
+**Order matters: commit and push first.** `gh release create` tags whatever is at the branch head, so a release cut before pushing points at a commit nobody else can fetch.
+
+1. **Bump the version.** `MyAppVersion` in `installer.iss` is the single source — it drives Add/Remove Programs, and the git tag should match it.
+
+2. **Rebuild from clean.** If you *removed* anything from the template since the last build, delete `Output\` first; Inno overwrites files but never prunes them.
+   ```
+   ISCC.exe installer.iss
+   ```
+
+3. **Commit and push** the source changes (`installer.iss`, `Default\`, `README.md`).
+
+4. **Cut the release**, attaching the compiled setup:
+   ```
+   gh release create v1.1 Output\ObsidianContextMenu-Setup.exe --title "v1.1" --notes "..."
+   ```
+   `gh` creates the tag at the current branch head if it doesn't exist. Use `--generate-notes` instead of `--notes` to build notes from the commit log, or `--draft` to review before it goes public.
+
+**Verify** the asset actually uploaded — a release with no binary is the common failure:
+
+```
+gh release view v1.1 --json assets --jq '.assets[].name'
+```
+
+### What ships and what doesn't
+
+| | |
+|---|---|
+| In the release | `ObsidianContextMenu-Setup.exe` — installer, template and all, ~11 MB |
+| In the repo | Sources plus `Default\.obsidian\` (21 MB uncompressed) |
+| In neither | `open-vault.exe`, `seed-test.exe`, `Output\` — all gitignored build artifacts |
+
+The asset keeps the product name (`ObsidianContextMenu-Setup.exe`) rather than the repo name. Renaming it is cosmetic; `AppId` is what Windows matches on for upgrades, and that must never change.
+
+Releases are **unsigned**. Every download hits SmartScreen's "Windows protected your PC" — expected, and worth saying in the release notes so it doesn't read as a broken build.
+
 ---
 
 ## Troubleshooting
