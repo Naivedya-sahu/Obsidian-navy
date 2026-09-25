@@ -1,0 +1,3 @@
+.workspace-leaf-content[data-type="pdf"] .pdfViewer .page {
+    filter: invert(0.9) hue-rotate(180deg);
+}
